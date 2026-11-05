@@ -131,26 +131,34 @@ requestAnimationFrame(tick);
   const segs=[...document.querySelectorAll('#tl .seg')],lis=[...document.querySelectorAll('#list li')];
   const va=document.getElementById('va'),vb=document.getElementById('vb'),vn=document.getElementById('vn'),vtitle=document.getElementById('vtitle'),vw=document.getElementById('vw');
   const play=document.getElementById('play'),prog=document.getElementById('prog'),note=document.getElementById('note');
-  let cur=0,front=va,back=vb,audio=null,playing=false,fade=null;
+  let cur=0,front=va,back=vb,playing=false,fade=null,token=0;
+  // un único reproductor para toda la sección: nunca pueden sonar dos fragmentos a la vez
+  const audio=new Audio(); audio.preload='auto'; audio.loop=true; audio.volume=0;
+  audio.addEventListener('timeupdate',()=>{if(audio.duration)prog.style.width=(audio.currentTime/audio.duration*100)+'%'});
   function show(i,userPlay){
     const s=S[i]; cur=i;
     segs.forEach((x,k)=>x.classList.toggle('on',k===i)); lis.forEach((x,k)=>x.classList.toggle('on',k===i));
     back.src=s.img; back.style.transform='scale(1.04)'; back.classList.add('show'); front.classList.remove('show'); [front,back]=[back,front];
     setTimeout(()=>{front.style.transform='scale(1.0)'},50);
     vn.textContent=s.n; vtitle.textContent=s.t; vw.textContent=s.w; prog.style.width='0';
-    if(playing||userPlay) startAudio(s);
+    if(playing||userPlay) startAudio(s); else stopAudio(false);
   }
   function startAudio(s){
-    stopAudio(false);
-    audio=new Audio(); audio.src=s.prev; audio.preload='auto'; audio.volume=0; audio.loop=true;
-    audio.addEventListener('error',()=>{note.textContent='No se ha podido cargar el fragmento.';setPlaying(false)});
-    audio.addEventListener('timeupdate',()=>{if(audio.duration)prog.style.width=(audio.currentTime/audio.duration*100)+'%'});
-    audio.play().then(()=>{setPlaying(true);note.textContent='';fadeTo(1,500)}).catch(()=>{note.textContent='No se ha podido cargar el fragmento.';setPlaying(false)});
+    const my=++token; cancelAnimationFrame(fade);
+    audio.pause(); audio.volume=0; audio.src=s.prev; audio.currentTime=0; note.textContent='';
+    audio.play().then(()=>{if(my!==token)return;setPlaying(true);fadeTo(1,450)}).catch(()=>{if(my!==token)return;note.textContent='No se ha podido cargar el fragmento.';setPlaying(false)});
   }
-  function fadeTo(v,ms){cancelAnimationFrame(fade);const a=audio,from=a.volume,t0=performance.now();(function st(){if(!audio||audio!==a)return;const k=Math.min(1,(performance.now()-t0)/ms);a.volume=Math.max(0,Math.min(1,from+(v-from)*k));if(k<1)fade=requestAnimationFrame(st);else if(v===0){a.pause()}})()}
-  function stopAudio(soft){if(!audio)return;const a=audio;if(soft){fadeTo(0,350)}else{a.pause()}audio=null}
+  function fadeTo(v,ms,done){cancelAnimationFrame(fade);const from=audio.volume,t0=performance.now(),my=token;(function st(){if(my!==token)return;const k=Math.min(1,(performance.now()-t0)/ms);audio.volume=Math.max(0,Math.min(1,from+(v-from)*k));if(k<1)fade=requestAnimationFrame(st);else if(done)done()})()}
+  function stopAudio(soft){
+    const my=++token; cancelAnimationFrame(fade); setPlaying(false);
+    if(soft&&!audio.paused){const from=audio.volume,t0=performance.now();(function st(){if(my!==token)return;const k=Math.min(1,(performance.now()-t0)/300);audio.volume=Math.max(0,from*(1-k));if(k<1)fade=requestAnimationFrame(st);else audio.pause()})()}
+    else{audio.pause();audio.volume=0}
+    prog.style.width='0';
+  }
   function setPlaying(v){playing=v;play.setAttribute('aria-pressed',v?'true':'false');play.querySelector('.lbl').textContent=v?'Pausa':'Escuchar 30 s'}
-  play.addEventListener('click',()=>{if(playing){stopAudio(true);setPlaying(false)}else startAudio(S[cur])});
+  window.__pauseAudio=()=>stopAudio(true);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)stopAudio(false)});
+  play.addEventListener('click',()=>{if(playing)stopAudio(true);else startAudio(S[cur])});
   segs.forEach((b,i)=>{b.addEventListener('click',()=>show(i,false));b.addEventListener('mouseenter',()=>{if(!playing)show(i,false)})});
   lis.forEach((li,i)=>{li.addEventListener('click',()=>show(i,true));li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show(i,true)}})});
   show(0,false);
@@ -162,6 +170,7 @@ requestAnimationFrame(tick);
 /* ---------- vídeos: el iframe se carga al pulsar ---------- */
 document.querySelectorAll('.video').forEach(v=>{
   v.querySelector('.vplay').addEventListener('click',()=>{
+    if(window.__pauseAudio)window.__pauseAudio();
     const f=document.createElement('iframe');
     f.src=`https://www.youtube-nocookie.com/embed/${v.dataset.yt}?autoplay=1&rel=0`;
     f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'; f.allowFullscreen=true; f.title=v.querySelector('.vplay').textContent;
@@ -173,6 +182,7 @@ document.querySelectorAll('.bleed[data-yt]').forEach(sec=>{
   const btn=sec.querySelector('.bplay'); if(!btn)return;
   btn.addEventListener('click',()=>{
     if(sec.classList.contains('playing'))return;
+    if(window.__pauseAudio)window.__pauseAudio();
     const w=document.createElement('div'); w.className='vframe';
     const f=document.createElement('iframe');
     f.src=`https://www.youtube-nocookie.com/embed/${sec.dataset.yt}?autoplay=1&rel=0`;
