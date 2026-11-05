@@ -168,5 +168,21 @@ document.querySelectorAll('.video').forEach(v=>{
     v.innerHTML=''; v.appendChild(f);
   });
 });
+/* ---------- vídeo dentro de las secciones de fondo ---------- */
+document.querySelectorAll('.bleed[data-yt]').forEach(sec=>{
+  const btn=sec.querySelector('.bplay'); if(!btn)return;
+  btn.addEventListener('click',()=>{
+    if(sec.classList.contains('playing'))return;
+    const w=document.createElement('div'); w.className='vframe';
+    const f=document.createElement('iframe');
+    f.src=`https://www.youtube-nocookie.com/embed/${sec.dataset.yt}?autoplay=1&rel=0`;
+    f.allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'; f.allowFullscreen=true; f.title=btn.textContent.trim();
+    const x=document.createElement('button'); x.type='button'; x.className='vclose'; x.textContent='Cerrar';
+    x.addEventListener('click',()=>{sec.classList.remove('playing');setTimeout(()=>{w.remove();x.remove()},500)});
+    w.appendChild(f); sec.appendChild(w); sec.appendChild(x);
+    requestAnimationFrame(()=>sec.classList.add('playing'));
+    sec.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
 /* ---------- (fin) ---------- */
 })();
