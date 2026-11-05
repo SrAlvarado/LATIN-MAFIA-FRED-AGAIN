@@ -154,9 +154,9 @@ requestAnimationFrame(tick);
   segs.forEach((b,i)=>{b.addEventListener('click',()=>show(i,false));b.addEventListener('mouseenter',()=>{if(!playing)show(i,false)})});
   lis.forEach((li,i)=>{li.addEventListener('click',()=>show(i,true));li.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show(i,true)}})});
   show(0,false);
-  fetch('https://itunes.apple.com/lookup?id=6796842304&entity=song').then(r=>r.json()).then(d=>{
-    (d.results||[]).filter(x=>x.wrapperType==='track').forEach(x=>{const s=S[x.trackNumber-1];if(s&&x.previewUrl)s.prev=x.previewUrl});
-  }).catch(()=>{});
+  // las URLs de los fragmentos caducan: se refrescan por JSONP (la API de iTunes no envía CORS)
+  window.__itn=d=>{(d.results||[]).filter(x=>x.wrapperType==='track').forEach(x=>{const s=S[x.trackNumber-1];if(s&&x.previewUrl)s.prev=x.previewUrl})};
+  const sc=document.createElement('script');sc.src='https://itunes.apple.com/lookup?id=6796842304&entity=song&callback=__itn';sc.async=true;document.head.appendChild(sc);
 })();
 
 /* ---------- vídeos: el iframe se carga al pulsar ---------- */
